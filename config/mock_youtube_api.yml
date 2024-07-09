@@ -1,0 +1,8 @@
+development:
+  base_uri: 'https://mock-youtube-api-f3d0c17f0e38.herokuapp.com/api'
+
+test:
+  base_uri: 'https://mock-youtube-api-f3d0c17f0e38.herokuapp.com/api'
+
+production:
+  base_uri: 'https://mock-youtube-api-f3d0c17f0e38.herokuapp.com/api'
