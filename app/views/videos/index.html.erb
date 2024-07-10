@@ -9,7 +9,7 @@
 <% end %>
 
 <div class="row">
-  <% @videos.each do |video| %>
+  <% @videos.first(10).each do |video| %> <!-- Display only the first 10 videos -->
     <div class="col-md-4">
       <div class="card mb-4">
         <img class="card-img-top" src="<%= video.thumbnail_url %>" alt="<%= video.title %>">
