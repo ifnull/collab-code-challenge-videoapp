@@ -1,34 +1,132 @@
-<h1>Videos</h1>
-<%= form_with url: search_videos_path, method: :get, local: true do %>
-  <div class="input-group mb-3">
-    <input type="text" name="query" class="form-control" placeholder="Search videos by title" value="<%= params[:query] %>">
-    <div class="input-group-append">
-      <button class="btn btn-outline-secondary" type="submit">Search</button>
+<div class="container">
+  <div class="row">
+    <div class="col-md-12">
+      <%= form_with url: videos_path, method: :get, local: true do %>
+        <div class="form-group">
+          <%= text_field_tag :search, params[:search], placeholder: "Search videos", class: "form-control" %>
+        </div>
+        <%= submit_tag "Search", class: "btn btn-primary" %>
+      <% end %>
     </div>
   </div>
-<% end %>
 
-<div class="row">
-  <% @videos.first(10).each do |video| %> <!-- Display only the first 10 videos -->
-    <div class="col-md-4">
-      <div class="card mb-4">
-        <img class="card-img-top" src="<%= video.thumbnail_url %>" alt="<%= video.title %>">
-        <div class="card-body">
-          <h5 class="card-title"><%= video.title %></h5>
-          <p class="card-text"><%= video.description %></p>
-          <p class="card-text"><small class="text-muted">Views: <%= video.views %></small></p>
+  <div class="row">
+    <% @videos.each do |video| %>
+      <div class="col-md-4">
+        <div class="card mb-4">
+          <img class="card-img-top video-component" src="<%= video.thumbnail_url %>" alt="<%= video.title %>">
+          <div class="card-body">
+            <h5 class="card-title video-title" style="height: 3em; overflow: hidden;"><%= video.title %></h5>
+            <p class="card-text video-description" style="height: 5em; overflow: hidden;"><%= video.description %></p>
+            <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#videoModal" data-video-id="<%= video.video_id %>" data-description="<%= j video.description %>" data-title="<%= j video.title %>" data-id="<%= video.id %>">
+              Watch Video
+            </button>
+          </div>
         </div>
       </div>
+    <% end %>
+  </div>
+
+  <div class="row">
+    <div class="col-md-12">
+      <%= paginate @videos, theme: 'bootstrap4' %>
     </div>
-  <% end %>
+  </div>
 </div>
 
-<nav aria-label="Page navigation">
-  <ul class="pagination">
-    <% (1..@total_pages).each do |page| %>
-      <li class="page-item <%= 'active' if page == params[:page].to_i %>">
-        <%= link_to page, videos_path(page: page, query: params[:query]), class: 'page-link' %>
-      </li>
-    <% end %>
-  </ul>
-</nav>
+<!-- Modal -->
+<div class="modal fade" id="videoModal" tabindex="-1" role="dialog" aria-labelledby="videoModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="videoModalLabel">Video Player</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <iframe id="videoPlayer" width="100%" height="315" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+        <p id="fullDescription"></p>
+        <h5>Playlists</h5>
+        <ul id="playlistsForVideo"></ul>
+        <h5>Add to Playlist</h5>
+        <form id="addVideoToPlaylistForm" method="post">
+          <div class="form-group">
+            <select id="playlistSelect" class="form-control">
+              <% Playlist.all.each do |playlist| %>
+                <option value="<%= playlist.id %>"><%= playlist.name %></option>
+              <% end %>
+            </select>
+          </div>
+          <div class="form-group">
+            <button type="submit" class="btn btn-primary">Add to Playlist</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('turbolinks:load', function() {
+    $('#videoModal').on('show.bs.modal', function (event) {
+      var button = $(event.relatedTarget);
+      var videoId = button.data('video-id');
+      var videoTitle = button.data('title');
+      var videoDescription = button.data('description');
+      var videoElementId = button.data('id');
+      var modal = $(this);
+
+      modal.find('.modal-title').text(videoTitle);
+      modal.find('#videoPlayer').attr('src', 'https://www.youtube.com/embed/' + videoId);
+      modal.find('#fullDescription').text(videoDescription);
+
+      // Clear existing playlists
+      $('#playlistsForVideo').empty();
+
+      // Fetch playlists for video
+      $.ajax({
+        url: '/playlists',
+        method: 'GET',
+        success: function(playlists) {
+          playlists.forEach(function(playlist) {
+            if (playlist.videos.some(video => video.id === videoElementId)) {
+              $('#playlistsForVideo').append('<li>' + playlist.name + ' <a href="#" data-playlist-id="' + playlist.id + '" class="remove-from-playlist">x</a></li>');
+            }
+          });
+        }
+      });
+
+      // Update form action
+      $('#addVideoToPlaylistForm').off('submit').on('submit', function(event) {
+        event.preventDefault();
+        var playlistId = $('#playlistSelect').val();
+        $.ajax({
+          url: '/playlists/' + playlistId + '/add_video',
+          method: 'POST',
+          data: { video_id: videoElementId },
+          success: function() {
+            $('#videoModal').modal('hide');
+          }
+        });
+      });
+
+      $(document).off('click', '.remove-from-playlist').on('click', '.remove-from-playlist', function(event) {
+        event.preventDefault();
+        var playlistId = $(this).data('playlist-id');
+        $.ajax({
+          url: '/playlists/' + playlistId + '/remove_video',
+          method: 'DELETE',
+          data: { video_id: videoElementId },
+          success: function() {
+            $('#videoModal').modal('hide');
+          }
+        });
+      });
+    });
+
+    $('#videoModal').on('hide.bs.modal', function () {
+      $('#videoPlayer').attr('src', '');
+    });
+  });
+</script>

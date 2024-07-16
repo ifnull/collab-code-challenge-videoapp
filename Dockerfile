@@ -17,15 +17,18 @@ COPY Gemfile ./
 #COPY Gemfile Gemfile.lock ./
 
 # Install gems
-RUN bundle install
+RUN bundle install --redownload
+RUN bundle binstubs --all
 
 # Copy the rest of the application code
 COPY . .
 
 # Install node modules and compile assets
 RUN yarn install --check-files
-
+RUN rails webpacker:install
+RUN bundle exec rails app:update:bin
 RUN bundle exec rails webpacker:compile
+
 
 # Expose port 3000 to the Docker host, so we can access the Rails app
 EXPOSE 3000
